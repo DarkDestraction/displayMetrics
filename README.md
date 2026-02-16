@@ -101,10 +101,16 @@ grafana-server --homepath $PREFIX/share/grafana &
 
 Scrittura e debug degli script PowerShell per raccolta dati, configurazione Telegraf/InfluxDB, integrazione end‑to‑end e documentazione.
 
----
+## Screenshot Dashboard
 
-Se vuoi, posso:
+Ecco come appare la dashboard su Huawei Display:
 
-- inserire esempi di `telegraf.conf` e snippet di script `collect-*` direttamente nel README;
-- aggiungere comandi di installazione/auto‑start per Windows e Termux;
-- preparare un commit con queste modifiche.
+![Hardware](screenshots/pc-metrics-m.png)
+![Weather](screenshots/weather-m.png)
+![Network](screenshots/network-m.png)
+
+Ecco come appare la dashboard su Desktop Display:
+
+![Hardware](screenshots/pc-metrics-d.png)
+![Weather](screenshots/weather-d.png)
+![Network](screenshots/network-d.png)
