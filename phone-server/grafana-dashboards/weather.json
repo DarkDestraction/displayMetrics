@@ -1,0 +1,192 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    { "title": "PC Hardware", "url": "/d/pc-hardware/pc-hardware?kiosk", "type": "link", "icon": "desktop" },
+    { "title": "Rete", "url": "/d/network/rete?kiosk", "type": "link", "icon": "signal" },
+    { "title": "Server", "url": "/d/server/server-cloud?kiosk", "type": "link", "icon": "server" }
+  ],
+  "liveNow": true,
+  "panels": [
+    {
+      "title": "Temperatura Attuale",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "influxdb-weather" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "blue", "value": null },
+              { "color": "super-light-blue", "value": 0 },
+              { "color": "green", "value": 15 },
+              { "color": "#EAB839", "value": 25 },
+              { "color": "orange", "value": 30 },
+              { "color": "red", "value": 35 }
+            ]
+          },
+          "color": { "mode": "thresholds" },
+          "mappings": []
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "graphMode": "area",
+        "colorMode": "background",
+        "justifyMode": "center",
+        "textMode": "value_and_name"
+      },
+      "targets": [
+        {
+          "query": "SELECT last(\"temperature\") AS \"Temperatura\", last(\"feels_like\") AS \"Percepita\" FROM \"current_weather\" WHERE $timeFilter",
+          "rawQuery": true
+        }
+      ]
+    },
+    {
+      "title": "Umidità",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 5, "x": 8, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "influxdb-weather" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0, "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "orange", "value": null },
+              { "color": "green", "value": 30 },
+              { "color": "blue", "value": 70 },
+              { "color": "dark-blue", "value": 90 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "query": "SELECT last(\"humidity\") FROM \"current_weather\" WHERE $timeFilter",
+          "rawQuery": true
+        }
+      ]
+    },
+    {
+      "title": "Vento",
+      "type": "stat",
+      "gridPos": { "h": 8, "w": 5, "x": 13, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "influxdb-weather" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "velocityms",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "#EAB839", "value": 10 },
+              { "color": "orange", "value": 20 },
+              { "color": "red", "value": 30 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false },
+        "graphMode": "area",
+        "colorMode": "background",
+        "justifyMode": "center"
+      },
+      "targets": [
+        {
+          "query": "SELECT last(\"wind_speed\") AS \"Vento\" FROM \"current_weather\" WHERE $timeFilter",
+          "rawQuery": true
+        }
+      ]
+    },
+    {
+      "title": "Nuvolosità",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 0 },
+      "datasource": { "type": "influxdb", "uid": "influxdb-weather" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0, "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "#FFC300", "value": null },
+              { "color": "light-blue", "value": 30 },
+              { "color": "#6E6E6E", "value": 70 },
+              { "color": "#3D3D3D", "value": 90 }
+            ]
+          },
+          "color": { "mode": "thresholds" }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "query": "SELECT last(\"clouds\") FROM \"current_weather\" WHERE $timeFilter",
+          "rawQuery": true
+        }
+      ]
+    },
+    {
+      "title": "Previsioni Prossime 24h",
+      "type": "timeseries",
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 8 },
+      "datasource": { "type": "influxdb", "uid": "influxdb-weather" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "custom": {
+            "drawStyle": "line",
+            "lineInterpolation": "smooth",
+            "fillOpacity": 25,
+            "gradientMode": "scheme",
+            "lineWidth": 2,
+            "pointSize": 6,
+            "showPoints": "always"
+          },
+          "color": { "mode": "continuous-BlYlRd" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "Precipitazioni" },
+            "properties": [
+              { "id": "unit", "value": "percent" },
+              { "id": "custom.drawStyle", "value": "bars" },
+              { "id": "custom.fillOpacity", "value": 40 },
+              { "id": "custom.axisPlacement", "value": "right" }
+            ]
+          }
+        ]
+      },
+      "targets": [
+        {
+          "query": "SELECT \"temperature\" AS \"Temperatura\", \"pop\" AS \"Precipitazioni\" FROM \"weather_forecast\" WHERE time > now() AND $timeFilter",
+          "rawQuery": true
+        }
+      ]
+    }
+  ],
+  "refresh": "10m",
+  "schemaVersion": 39,
+  "tags": ["weather", "meteo"],
+  "templating": { "list": [] },
+  "time": { "from": "now-24h", "to": "now+24h" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Meteo",
+  "uid": "weather"
+}

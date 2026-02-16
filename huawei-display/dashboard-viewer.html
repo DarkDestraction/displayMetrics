@@ -1,0 +1,1863 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dashboard Monitor</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@200;400;500;600;700&display=swap" media="print" onload="this.media='all'">
+    <style>
+
+        :root {
+            --bg: #0a0e1a;
+            --card: rgba(20, 28, 50, 0.85);
+            --card-border: rgba(255,255,255,0.06);
+            --text: #e8eaf0;
+            --text-dim: rgba(255,255,255,0.45);
+            --accent: #3b82f6;
+            --green: #22c55e;
+            --yellow: #eab308;
+            --orange: #f97316;
+            --red: #ef4444;
+            --blue: #38bdf8;
+            --purple: #a78bfa;
+            --radius: 16px;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Inter', -apple-system, sans-serif;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* ===== PAGES ===== */
+        .pages-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        .page {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            display: flex;
+            flex-direction: column;
+            overflow-y: auto;
+            overflow-x: hidden;
+            padding: 4px 6px 42px;
+            scrollbar-width: none;
+            transform: translateX(100%);
+            opacity: 0;
+            pointer-events: none;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+        }
+        .page::-webkit-scrollbar { display: none; }
+        .page.active {
+            transform: translateX(0);
+            opacity: 1;
+            pointer-events: auto;
+        }
+        .page.exit-left {
+            transform: translateX(-30%);
+            opacity: 0;
+        }
+        .page.exit-right {
+            transform: translateX(30%);
+            opacity: 0;
+        }
+
+        /* ===== GRID ===== */
+        .grid { display: grid; gap: 4px; align-items: start; }
+        .grid-2 { grid-template-columns: 1fr 1fr; }
+        .grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+        .grid-1 { grid-template-columns: 1fr; }
+
+        /* ===== CARDS ===== */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 6px 8px;
+            backdrop-filter: blur(12px);
+            position: relative;
+            overflow: hidden;
+            contain: content;
+        }
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--accent), transparent);
+            opacity: 0.3;
+        }
+        .card-label {
+            font-size: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            color: var(--text-dim);
+            margin-bottom: 2px;
+        }
+        .card-value {
+            font-size: 18px;
+            font-weight: 700;
+            line-height: 1;
+            font-variant-numeric: tabular-nums;
+        }
+        .card-unit {
+            font-size: 10px;
+            font-weight: 400;
+            color: var(--text-dim);
+            margin-left: 2px;
+        }
+        .card-sub {
+            font-size: 8px;
+            color: var(--text-dim);
+            margin-top: 1px;
+        }
+        .card-value.null-value {
+            color: rgba(255,255,255,0.15);
+        }
+
+        /* Disk card labels */
+        .disk-label { font-weight: 600; font-size: 10px; }
+        .disk-pct { font-weight: 600; font-size: 10px; }
+        /* GPU Info smaller values */
+        .gpu-info-val { font-size: 14px !important; }
+
+        /* ===== GAUGE RING ===== */
+        .gauge-ring {
+            width: 56px;
+            height: 56px;
+            margin: 0 auto 1px;
+            position: relative;
+        }
+        .gauge-ring svg {
+            transform: rotate(-90deg);
+            width: 100%;
+            height: 100%;
+        }
+        .gauge-ring .track {
+            fill: none;
+            stroke: rgba(255,255,255,0.06);
+            stroke-width: 8;
+        }
+        .gauge-ring .fill {
+            fill: none;
+            stroke-width: 8;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.8s ease, stroke 0.5s ease;
+        }
+        .gauge-center {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+        }
+        .gauge-center .val {
+            font-size: 14px;
+            font-weight: 700;
+        }
+        .gauge-center .unit {
+            font-size: 7px;
+            color: var(--text-dim);
+        }
+
+        /* ===== SPARKLINE ===== */
+        .sparkline-container {
+            margin-top: 8px;
+            height: 40px;
+            position: relative;
+        }
+        .sparkline-container svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* ===== COLLAPSIBLE SPARKLINE ===== */
+        .usage-card { position: relative; contain: none !important; overflow: visible !important; }
+        .spark-toggle {
+            position: absolute;
+            top: 4px;
+            right: 6px;
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+            font-size: 10px;
+            transition: transform 0.3s ease;
+            z-index: 2;
+            user-select: none;
+            -webkit-user-select: none;
+            border: none;
+            background: none;
+            padding: 0;
+        }
+        .spark-toggle.open { transform: rotate(180deg); }
+        .spark-collapse {
+            overflow: hidden;
+            transition: max-height 0.35s ease, opacity 0.25s ease;
+            max-height: 0;
+            opacity: 0;
+        }
+        .spark-collapse.open {
+            max-height: 140px;
+            opacity: 1;
+        }
+        .spark-collapse .sparkline-container {
+            margin-top: 6px;
+            height: 110px;
+        }
+
+        /* ===== BAR ===== */
+        .bar-container {
+            background: rgba(255,255,255,0.06);
+            border-radius: 3px;
+            height: 4px;
+            overflow: hidden;
+            margin-top: 2px;
+        }
+        .bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.8s ease, background 0.5s ease;
+        }
+
+        /* ===== WEATHER HERO ===== */
+        .weather-hero {
+            text-align: center;
+            padding: 20px 10px;
+            position: relative;
+            overflow: visible;
+            contain: none;
+        }
+        .weather-icon-container {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 12px;
+            position: relative;
+        }
+        .weather-icon-container svg {
+            width: 100%;
+            height: 100%;
+        }
+        .weather-temp {
+            font-size: 52px;
+            font-weight: 200;
+            line-height: 1;
+        }
+        .weather-desc {
+            font-size: 14px;
+            color: var(--text-dim);
+            margin-top: 6px;
+            text-transform: capitalize;
+        }
+        .weather-feels {
+            font-size: 12px;
+            color: var(--text-dim);
+            margin-top: 2px;
+        }
+
+        .weather-detail-row {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 16px;
+            gap: 2px;
+            width: 100%;
+            overflow: hidden;
+        }
+        .weather-detail-item {
+            text-align: center;
+            min-width: 0;
+            flex: 1 1 0;
+            overflow: hidden;
+            max-width: 25%;
+        }
+        .weather-detail-item .wd-icon { font-size: 20px; margin-bottom: 4px; }
+        .weather-detail-item .wd-val {
+            font-size: clamp(11px, 3.2vw, 16px);
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+        .weather-detail-item .wd-label {
+            font-size: clamp(7px, 2vw, 9px);
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* ===== FORECAST STRIP ===== */
+        .forecast-strip {
+            display: flex;
+            overflow-x: auto;
+            gap: 8px;
+            padding: 8px 0;
+            scrollbar-width: none;
+            cursor: grab;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+        .forecast-strip::-webkit-scrollbar { display: none; }
+        .forecast-strip.dragging { cursor: grabbing; }
+        .forecast-item {
+            flex: 0 0 60px;
+            text-align: center;
+            padding: 10px 4px;
+            background: rgba(255,255,255,0.04);
+            border-radius: 12px;
+            border: 1px solid rgba(255,255,255,0.04);
+        }
+        .forecast-item .f-time { font-size: 10px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .forecast-item .f-icon { font-size: 22px; margin: 6px 0; }
+        .forecast-item .f-temp { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .forecast-item .f-pop { font-size: 9px; color: var(--blue); margin-top: 2px; white-space: nowrap; }
+
+        /* ===== NETWORK SPEED ===== */
+        .speed-big { text-align: center; padding: 8px; }
+        .speed-big .speed-arrow { font-size: 28px; margin-bottom: 4px; }
+        .speed-big .speed-val { font-size: 42px; font-weight: 700; line-height: 1; }
+        .speed-big .speed-unit { font-size: 12px; color: var(--text-dim); }
+        .speed-big .speed-label {
+            font-size: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-dim);
+            margin-top: 4px;
+        }
+
+        /* ===== NAVBAR ===== */
+        .navbar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            display: flex;
+            z-index: 1000;
+            background: rgba(10, 14, 26, 0.95);
+            border-top: 1px solid rgba(255,255,255,0.08);
+            backdrop-filter: blur(20px);
+            padding-bottom: env(safe-area-inset-bottom, 0);
+        }
+        .nav-tab {
+            flex: 1;
+            padding: 5px 4px 4px;
+            text-align: center;
+            cursor: pointer;
+            color: var(--text-dim);
+            font-size: 9px;
+            font-weight: 500;
+            transition: color 0.3s;
+            border: none;
+            background: none;
+            position: relative;
+        }
+        .nav-tab.active { color: var(--accent); }
+        .nav-tab.active::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 25%; right: 25%;
+            height: 2px;
+            background: var(--accent);
+            border-radius: 0 0 2px 2px;
+        }
+        .nav-tab .icon { font-size: 16px; display: block; margin-bottom: 1px; }
+
+        /* ===== STATUS DOT ===== */
+        .status-dot {
+            position: fixed;
+            top: 6px;
+            right: 6px;
+            z-index: 1001;
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: var(--green);
+            box-shadow: 0 0 6px var(--green);
+            transition: background 0.3s, box-shadow 0.3s;
+        }
+        .status-dot.error { background: var(--red); box-shadow: 0 0 6px var(--red); }
+
+        /* ===== SECTION TITLE ===== */
+        .section-title {
+            font-size: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--text-dim);
+            margin: 3px 0 2px;
+            padding-left: 4px;
+        }
+
+        /* ===== ANIMATIONS ===== */
+        @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+        @keyframes rain-drop { 0% { transform: translateY(-8px); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateY(8px); opacity: 0; } }
+        @keyframes snow-fall { 0% { transform: translateY(-8px) rotate(0deg); opacity: 0; } 50% { opacity: 1; } 100% { transform: translateY(8px) rotate(180deg); opacity: 0; } }
+        @keyframes lightning { 0%,100% { opacity: 0; } 10% { opacity: 1; } 20% { opacity: 0; } 30% { opacity: 0.8; } 40% { opacity: 0; } }
+        @keyframes drift { 0% { transform: translateX(0); } 50% { transform: translateX(6px); } 100% { transform: translateX(0); } }
+
+        .weather-anim { animation: float 4s ease-in-out infinite; }
+        .cloud-drift { animation: drift 6s ease-in-out infinite; }
+        .rain-anim { animation: rain-drop 1s ease-in-out infinite; }
+        .snow-anim { animation: snow-fall 2s ease-in-out infinite; }
+        .lightning-anim { animation: lightning 3s ease-in-out infinite; }
+
+        .wind-arrow { display: inline-block; transition: transform 0.5s ease; }
+
+        /* ===== RETE PAGE FLEX LAYOUT ===== */
+        #speed-chart-card {
+            flex: 1;
+            min-height: 180px;
+            margin-top: 10px;
+            display: flex;
+            flex-direction: column;
+        }
+        #speed-chart-card .card-label { flex-shrink: 0; }
+        .chart-wrap {
+            flex: 1;
+            position: relative;
+            min-height: 0;
+        }
+        .chart-wrap canvas {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .chart-legend {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+            margin-top: 6px;
+            flex-shrink: 0;
+        }
+        .chart-legend-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 10px;
+            color: var(--text-dim);
+        }
+        .chart-legend-dot {
+            width: 10px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        /* ===== DESKTOP (tablet+) ===== */
+        @media (min-width: 768px) {
+            body { overflow: hidden; }
+
+            .pages-container {
+                max-width: 100%;
+                margin: 0 auto;
+                width: 100%;
+            }
+
+            .page {
+                padding: 60px 24px 32px;
+                overflow-y: auto;
+            }
+
+            /* Navbar → top bar */
+            .navbar {
+                top: 0;
+                bottom: auto;
+                border-top: none;
+                border-bottom: 1px solid rgba(255,255,255,0.08);
+                justify-content: center;
+                gap: 4px;
+                padding-bottom: 0;
+            }
+            .nav-tab {
+                flex: 0 0 auto;
+                padding: 14px 36px;
+                font-size: 13px;
+                font-weight: 600;
+            }
+            .nav-tab .icon {
+                display: inline;
+                font-size: 16px;
+                margin-right: 6px;
+                margin-bottom: 0;
+            }
+            .nav-tab.active::before {
+                top: auto;
+                bottom: 0;
+                left: 15%;
+                right: 15%;
+                height: 3px;
+                border-radius: 3px 3px 0 0;
+            }
+
+            .status-dot {
+                top: 16px;
+                right: 20px;
+                width: 10px;
+                height: 10px;
+            }
+
+            /* Cards */
+            .card {
+                padding: 20px;
+                border-radius: 20px;
+            }
+            .card::before { height: 2px; }
+            .card-label {
+                font-size: 12px;
+                letter-spacing: 1.5px;
+                margin-bottom: 10px;
+            }
+            .card-value { font-size: 34px; }
+            .card-unit { font-size: 16px; }
+            .card-sub { font-size: 13px; margin-top: 8px; }
+
+            .grid { gap: 16px; }
+
+            .section-title {
+                font-size: 13px;
+                letter-spacing: 2px;
+                margin: 12px 0 8px;
+            }
+
+            /* Gauges */
+            .gauge-ring {
+                width: 120px;
+                height: 120px;
+                margin-bottom: 12px;
+            }
+            .gauge-center .val { font-size: 26px; }
+            .gauge-center .unit { font-size: 12px; }
+
+            /* Sparkline & Bar */
+            .sparkline-container { height: 56px; margin-top: 10px; }
+            .bar-container { height: 12px; margin-top: 10px; border-radius: 8px; }
+            .bar-fill { border-radius: 8px; }
+
+            /* Weather */
+            .weather-hero {
+                padding: 20px 24px;
+                display: grid;
+                grid-template-columns: 110px 1fr;
+                grid-template-rows: auto auto auto auto;
+                gap: 0 20px;
+                text-align: left;
+            }
+            .weather-icon-container {
+                grid-row: 1 / 4;
+                width: 100px !important;
+                height: 100px !important;
+                margin: 0 !important;
+                align-self: center;
+            }
+            .weather-temp { font-size: 44px; }
+            .weather-desc { font-size: 14px; margin-top: 2px; }
+            .weather-feels { font-size: 12px; margin-top: 1px; }
+            .weather-detail-row {
+                grid-column: 1 / -1;
+                margin-top: 14px;
+                gap: 6px;
+            }
+            .weather-detail-item .wd-icon { font-size: 20px; margin-bottom: 4px; }
+            .weather-detail-item .wd-val { font-size: clamp(13px, 1.6vw, 17px); }
+            .weather-detail-item .wd-label { font-size: clamp(8px, 1vw, 10px); letter-spacing: 0.8px; }
+
+            /* Forecast */
+            .forecast-strip { gap: 10px; padding: 8px 0; }
+            .forecast-item {
+                flex: 0 0 72px;
+                padding: 10px 6px;
+                border-radius: 14px;
+            }
+            .forecast-item .f-time { font-size: 11px; }
+            .forecast-item .f-icon { font-size: 22px; margin: 4px 0; }
+            .forecast-item .f-temp { font-size: 15px; }
+            .forecast-item .f-pop { font-size: 10px; }
+
+            /* Network */
+            .speed-big { padding: 16px; }
+            .speed-big .speed-arrow { font-size: 34px; margin-bottom: 6px; }
+            .speed-big .speed-val { font-size: 52px; }
+            .speed-big .speed-unit { font-size: 14px; }
+            .speed-big .speed-label { font-size: 12px; margin-top: 6px; letter-spacing: 2px; }
+
+            #speed-chart-card { min-height: 280px; margin-top: 16px; }
+            .chart-legend { margin-top: 10px; gap: 24px; }
+            .chart-legend-item { font-size: 12px; }
+            .chart-legend-dot { width: 14px; height: 4px; }
+
+            /* Disk cards */
+            #disk-container .card { padding: 16px 20px; }
+            #disk-container .card-sub { font-size: 12px; }
+
+            /* PC page desktop: proper spacing */
+            #page-pc { gap: 16px; }
+            #page-pc .grid[style*="margin-top"] { margin-top: 0 !important; }
+            .gpu-info-val { font-size: 22px !important; }
+            .disk-label { font-size: 14px; }
+            .disk-pct { font-size: 14px; }
+        }
+
+        /* ===== WIDE DESKTOP (1200px+) ===== */
+        @media (min-width: 1200px) {
+            .pages-container { max-width: 100%; }
+            .page { padding: 60px 40px 40px; }
+
+            .grid { gap: 20px; }
+            .card { padding: 24px; border-radius: 22px; }
+            .card-label { font-size: 13px; margin-bottom: 12px; }
+            .card-value { font-size: 38px; }
+            .card-unit { font-size: 18px; }
+            .section-title { font-size: 14px; margin: 16px 0 10px; }
+
+            .gauge-ring { width: 140px; height: 140px; }
+            .gauge-center .val { font-size: 30px; }
+            .gauge-center .unit { font-size: 14px; }
+
+            .sparkline-container { height: 64px; }
+
+            .weather-hero {
+                padding: 24px 28px;
+                grid-template-columns: 130px 1fr;
+                gap: 0 24px;
+            }
+            .weather-icon-container {
+                width: 120px !important;
+                height: 120px !important;
+            }
+            .weather-temp { font-size: 52px; }
+            .weather-desc { font-size: 16px; }
+            .weather-feels { font-size: 14px; }
+            .weather-detail-item .wd-icon { font-size: 24px; }
+            .weather-detail-item .wd-val { font-size: clamp(15px, 1.5vw, 20px); }
+            .weather-detail-item .wd-label { font-size: clamp(9px, 1vw, 11px); }
+
+            .forecast-item { flex: 0 0 90px; padding: 16px 8px; }
+            .forecast-item .f-icon { font-size: 30px; }
+            .forecast-item .f-temp { font-size: 18px; }
+
+            .speed-big .speed-val { font-size: 60px; }
+            .speed-big .speed-arrow { font-size: 38px; }
+            #speed-chart-card { min-height: 340px; }
+        }
+
+        /* ===== TALL DESKTOP: restore vertical hero layout ===== */
+        @media (min-width: 768px) and (min-height: 900px) {
+            .section-title { margin: 18px 0 10px; }
+
+            .weather-hero {
+                display: block;
+                text-align: center;
+                padding: 24px 20px;
+            }
+            .weather-icon-container {
+                grid-row: auto;
+                width: 130px !important;
+                height: 130px !important;
+                margin: 0 auto 10px !important;
+            }
+            .weather-temp { font-size: 56px; }
+            .weather-desc { font-size: 15px; margin-top: 6px; }
+            .weather-feels { font-size: 13px; margin-top: 3px; }
+            .weather-detail-row {
+                grid-column: auto;
+                margin-top: 18px;
+                gap: 8px;
+            }
+            .weather-detail-item .wd-icon { font-size: 22px; margin-bottom: 5px; }
+            .weather-detail-item .wd-val { font-size: 18px; }
+            .weather-detail-item .wd-label { font-size: 10px; letter-spacing: 0.8px; }
+
+            .forecast-strip { gap: 12px; padding: 10px 0; }
+            .forecast-item {
+                flex: 0 0 76px;
+                padding: 12px 6px;
+            }
+            .forecast-item .f-time { font-size: 12px; }
+            .forecast-item .f-icon { font-size: 24px; margin: 6px 0; }
+            .forecast-item .f-temp { font-size: 16px; }
+            .forecast-item .f-pop { font-size: 10px; }
+        }
+
+        /* ===== VERY TALL WIDE DESKTOP: full-size vertical hero ===== */
+        @media (min-width: 1200px) and (min-height: 1000px) {
+            .section-title { margin: 22px 0 12px; }
+
+            .weather-hero {
+                display: block;
+                text-align: center;
+                padding: 32px 24px;
+            }
+            .weather-icon-container {
+                width: 160px !important;
+                height: 160px !important;
+                margin: 0 auto 12px !important;
+            }
+            .weather-temp { font-size: 68px; }
+            .weather-desc { font-size: 17px; margin-top: 8px; }
+            .weather-feels { font-size: 15px; margin-top: 4px; }
+            .weather-detail-row { margin-top: 22px; gap: 10px; }
+            .weather-detail-item .wd-icon { font-size: 26px; margin-bottom: 6px; }
+            .weather-detail-item .wd-val { font-size: 21px; }
+            .weather-detail-item .wd-label { font-size: 11px; letter-spacing: 1px; }
+
+            .forecast-strip { gap: 14px; padding: 12px 0; }
+            .forecast-item {
+                flex: 0 0 88px;
+                padding: 14px 8px;
+            }
+            .forecast-item .f-time { font-size: 12px; }
+            .forecast-item .f-icon { font-size: 28px; margin: 6px 0; }
+            .forecast-item .f-temp { font-size: 18px; }
+            .forecast-item .f-pop { font-size: 11px; }
+        }
+
+        /* ===== PC PAGE: compact fit-to-screen (PHONE ONLY) ===== */
+        @media (max-width: 767px) {
+            #page-pc {
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                gap: 2px;
+                padding: 4px 6px 40px;
+            }
+            #page-pc .grid { gap: 3px; }
+            #page-pc .card { padding: 5px 8px; }
+            #page-pc .grid[style*="margin-top"] { margin-top: 2px !important; }
+            #gpu-info-grid .card { padding: 3px 6px; }
+        }
+
+        /* Sparklines: auto-expand on tall screens */
+        @media (min-height: 700px) and (max-width: 767px) {
+            .spark-collapse.auto-open { max-height: 140px; opacity: 1; }
+            .spark-toggle.auto-open { transform: rotate(180deg); }
+        }
+        @media (min-width: 768px) {
+            .spark-collapse.auto-open { max-height: 150px; opacity: 1; }
+            .spark-toggle.auto-open { transform: rotate(180deg); }
+            .spark-collapse .sparkline-container { height: 120px; }
+        }
+        @media (min-width: 1200px) {
+            .spark-collapse .sparkline-container { height: 130px; }
+            .spark-collapse.auto-open { max-height: 160px; }
+        }
+
+        /* ===== LANDSCAPE (phone only) ===== */
+        @media (orientation: landscape) and (max-width: 767px) {
+            .page { padding: 4px 8px 30px; overflow: hidden; }
+            .navbar { padding-bottom: 0; height: 28px; }
+            .nav-tab { padding: 2px 4px 2px; font-size: 8px; }
+            .nav-tab .icon { font-size: 12px; margin-bottom: 0; }
+            .nav-tab.active::before { height: 1px; }
+            .section-title { margin: 2px 0 2px; font-size: 8px; }
+            .grid { gap: 3px; }
+            .card { padding: 3px 5px; border-radius: 6px; }
+            .card::before { display: none; }
+            .card-label { margin-bottom: 1px; font-size: 7px; letter-spacing: 0.8px; }
+            .card-value { font-size: 13px; }
+            .card-unit { font-size: 9px; }
+            .card-sub { font-size: 7px; margin-top: 1px; }
+            .bar-container { height: 3px; margin-top: 2px; }
+            /* Sparklines hidden in landscape */
+            .spark-collapse { max-height: 0 !important; opacity: 0 !important; }
+            .spark-toggle { display: none !important; }
+
+            /* PC landscape */
+            #page-pc { padding-bottom: 28px !important; gap: 2px; }
+            #page-pc .grid { gap: 3px; }
+            .gauge-ring { width: 38px; height: 38px; margin-bottom: 0; }
+            .gauge-ring svg { stroke-width: 6; }
+            .gauge-center .val { font-size: 11px; }
+            .gauge-center .unit { font-size: 6px; }
+            #gpu-info-grid .gpu-info-val { font-size: 11px !important; }
+            #gpu-info-grid .card-label { font-size: 6px; }
+            #disk-container .card-sub { font-size: 6px; }
+            .disk-label, .disk-pct { font-size: 8px; }
+
+            /* Meteo landscape */
+            #page-meteo.active { overflow: hidden; }
+            .weather-hero {
+                display: grid !important;
+                grid-template-columns: 70px 1fr;
+                grid-template-rows: auto auto auto auto;
+                gap: 0 12px;
+                text-align: left;
+                padding: 8px 10px !important;
+            }
+            .weather-icon-container {
+                grid-row: 1 / 5;
+                width: 60px !important;
+                height: 60px !important;
+                margin: 0 !important;
+                align-self: center;
+            }
+            .weather-temp { font-size: 28px; }
+            .weather-desc { font-size: 10px; margin-top: 1px; }
+            .weather-feels { font-size: 10px; margin-top: 0; }
+            .weather-detail-row {
+                grid-column: 1 / -1;
+                margin-top: 6px;
+            }
+            .weather-detail-item .wd-icon { font-size: 14px; margin-bottom: 2px; }
+            .weather-detail-item .wd-val { font-size: 12px; }
+            .weather-detail-item .wd-label { font-size: 8px; }
+            #page-meteo .grid-2 { margin-top: 4px !important; }
+            #page-meteo .grid-2 .card-value { font-size: 14px !important; }
+            #page-meteo .grid-2 .card-value span[data-field] { font-size: 14px !important; }
+            .forecast-strip { padding: 4px 0; gap: 5px; }
+            .forecast-item { flex: 0 0 44px; padding: 4px 2px; border-radius: 8px; }
+            .forecast-item .f-time { font-size: 8px; }
+            .forecast-item .f-temp { font-size: 11px; }
+            .forecast-item .f-icon { font-size: 15px; margin: 2px 0; }
+            .forecast-item .f-pop { font-size: 8px; }
+
+            /* Rete landscape */
+            #page-rete.active { overflow: hidden; }
+            .speed-big { padding: 4px; }
+            .speed-big .speed-val { font-size: 28px; }
+            .speed-big .speed-arrow { font-size: 18px; margin-bottom: 1px; }
+            .speed-big .speed-unit { font-size: 10px; }
+            .speed-big .speed-label { font-size: 8px; margin-top: 2px; }
+            #page-rete .grid-3 { margin-top: 6px !important; }
+            #page-rete .grid-3 .card-value { font-size: 18px !important; }
+            #speed-chart-card { min-height: 60px; margin-top: 6px; }
+            .chart-legend { margin-top: 3px; gap: 12px; }
+            .chart-legend-item { font-size: 9px; }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Status indicator -->
+<div class="status-dot" id="statusDot"></div>
+
+<!-- Pages container -->
+<div class="pages-container">
+
+<!-- ==================== PAGE: PC HARDWARE ==================== -->
+<div class="page active" id="page-pc">
+    <div class="grid grid-3">
+        <div class="card">
+            <div class="card-label">CPU</div>
+            <div class="gauge-ring" id="gauge-cpu-temp">
+                <svg viewBox="0 0 100 100">
+                    <circle class="track" cx="50" cy="50" r="42"/>
+                    <circle class="fill" cx="50" cy="50" r="42" stroke-dasharray="264" stroke-dashoffset="264"/>
+                </svg>
+                <div class="gauge-center">
+                    <div class="val" data-field="cpu-temp">--</div>
+                    <div class="unit">°C</div>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-label">GPU</div>
+            <div class="gauge-ring" id="gauge-gpu-temp">
+                <svg viewBox="0 0 100 100">
+                    <circle class="track" cx="50" cy="50" r="42"/>
+                    <circle class="fill" cx="50" cy="50" r="42" stroke-dasharray="264" stroke-dashoffset="264"/>
+                </svg>
+                <div class="gauge-center">
+                    <div class="val" data-field="gpu-temp">--</div>
+                    <div class="unit">°C</div>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-label">SSD</div>
+            <div class="gauge-ring" id="gauge-ssd-temp">
+                <svg viewBox="0 0 100 100">
+                    <circle class="track" cx="50" cy="50" r="42"/>
+                    <circle class="fill" cx="50" cy="50" r="42" stroke-dasharray="264" stroke-dashoffset="264"/>
+                </svg>
+                <div class="gauge-center">
+                    <div class="val" data-field="ssd-temp">--</div>
+                    <div class="unit">°C</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-2" style="margin-top:2px">
+        <div class="card usage-card">
+            <button class="spark-toggle" id="toggle-cpu-spark" onclick="toggleSpark('cpu')" aria-label="Mostra grafico CPU">▼</button>
+            <div class="card-label">CPU Usage</div>
+            <div class="card-value" data-field="cpu-usage">--<span class="card-unit">%</span></div>
+            <div class="bar-container">
+                <div class="bar-fill" id="bar-cpu" style="width:0%"></div>
+            </div>
+            <div class="spark-collapse" id="spark-cpu-wrap">
+                <div class="sparkline-container"><svg id="spark-cpu" viewBox="0 0 200 40" preserveAspectRatio="none"></svg></div>
+            </div>
+        </div>
+        <div class="card usage-card">
+            <button class="spark-toggle" id="toggle-gpu-spark" onclick="toggleSpark('gpu')" aria-label="Mostra grafico GPU">▼</button>
+            <div class="card-label">GPU Usage</div>
+            <div class="card-value" data-field="gpu-usage">--<span class="card-unit">%</span></div>
+            <div class="bar-container">
+                <div class="bar-fill" id="bar-gpu" style="width:0%"></div>
+            </div>
+            <div class="spark-collapse" id="spark-gpu-wrap">
+                <div class="sparkline-container"><svg id="spark-gpu" viewBox="0 0 200 40" preserveAspectRatio="none"></svg></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-2" style="margin-top:2px">
+        <div class="card">
+            <div class="card-label">RAM</div>
+            <div class="card-value" data-field="ram-usage">--<span class="card-unit">%</span></div>
+            <div class="bar-container">
+                <div class="bar-fill" id="bar-ram" style="width:0%"></div>
+            </div>
+            <div class="card-sub" data-field="ram-avail"></div>
+        </div>
+        <div class="card">
+            <div class="card-label">VRAM</div>
+            <div class="card-value" data-field="vram-usage">--<span class="card-unit">%</span></div>
+            <div class="bar-container">
+                <div class="bar-fill" id="bar-vram" style="width:0%"></div>
+            </div>
+            <div class="card-sub" data-field="vram-detail"></div>
+        </div>
+    </div>
+
+    <div class="grid grid-3" id="gpu-info-grid" style="margin-top:2px">
+        <div class="card" style="text-align:center">
+            <div class="card-label">Power</div>
+            <div class="card-value gpu-info-val" data-field="gpu-power">--<span class="card-unit">W</span></div>
+        </div>
+        <div class="card" style="text-align:center">
+            <div class="card-label">Fan</div>
+            <div class="card-value gpu-info-val" data-field="gpu-fan">--<span class="card-unit">%</span></div>
+        </div>
+        <div class="card" style="text-align:center">
+            <div class="card-label">Clock</div>
+            <div class="card-value gpu-info-val" data-field="gpu-clock">--<span class="card-unit">MHz</span></div>
+        </div>
+    </div>
+
+    <div class="grid grid-2" id="disk-container" style="margin-top:2px"></div>
+</div>
+
+<!-- ==================== PAGE: METEO ==================== -->
+<div class="page" id="page-meteo">
+    <div class="card weather-hero">
+        <div class="weather-icon-container" id="weather-icon-main"></div>
+        <div class="weather-temp" data-field="w-temp">--°</div>
+        <div class="weather-desc" data-field="w-desc">--</div>
+        <div class="weather-feels" data-field="w-feels">Percepita: --°</div>
+
+        <div class="weather-detail-row">
+            <div class="weather-detail-item">
+                <div class="wd-icon">💧</div>
+                <div class="wd-val" data-field="w-humidity">--%</div>
+                <div class="wd-label">Umidità</div>
+            </div>
+            <div class="weather-detail-item">
+                <div class="wd-icon"><span class="wind-arrow" id="wind-arrow">↑</span></div>
+                <div class="wd-val" data-field="w-wind">-- km/h</div>
+                <div class="wd-label">Vento</div>
+            </div>
+            <div class="weather-detail-item">
+                <div class="wd-icon">🌡️</div>
+                <div class="wd-val" data-field="w-pressure">-- hPa</div>
+                <div class="wd-label">Pressione</div>
+            </div>
+            <div class="weather-detail-item">
+                <div class="wd-icon">☁️</div>
+                <div class="wd-val" data-field="w-clouds">--%</div>
+                <div class="wd-label">Nuvole</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="grid grid-2" style="margin-top:10px">
+        <div class="card" style="text-align:center;overflow:hidden">
+            <div class="card-label">Min / Max</div>
+            <div class="card-value" style="font-size:20px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                <span style="color:var(--blue)" data-field="w-min">--</span>
+                <span style="color:var(--text-dim);font-size:14px"> / </span>
+                <span style="color:var(--orange)" data-field="w-max">--</span>
+                <span class="card-unit">°C</span>
+            </div>
+        </div>
+        <div class="card" style="text-align:center;overflow:hidden">
+            <div class="card-label">Alba / Tramonto</div>
+            <div class="card-value" style="font-size:clamp(14px,3.5vw,20px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                <span style="color:var(--yellow)">🌅</span>
+                <span data-field="w-sunrise" style="font-size:inherit">--</span>
+                <span style="color:var(--text-dim);font-size:0.8em"> / </span>
+                <span style="color:var(--orange)">🌇</span>
+                <span data-field="w-sunset" style="font-size:inherit">--</span>
+            </div>
+        </div>
+    </div>
+
+    <div class="section-title">Previsioni 24h</div>
+    <div class="forecast-strip" id="forecast-strip"></div>
+</div>
+
+<!-- ==================== PAGE: RETE ==================== -->
+<div class="page" id="page-rete">
+    <div class="grid grid-2">
+        <div class="card speed-big">
+            <div class="speed-arrow" style="color:var(--green)">⬇</div>
+            <div class="speed-val" data-field="n-download">--</div>
+            <div class="speed-unit">Mbps</div>
+            <div class="speed-label">Download</div>
+        </div>
+        <div class="card speed-big">
+            <div class="speed-arrow" style="color:var(--blue)">⬆</div>
+            <div class="speed-val" data-field="n-upload">--</div>
+            <div class="speed-unit">Mbps</div>
+            <div class="speed-label">Upload</div>
+        </div>
+    </div>
+
+    <div class="grid grid-3" style="margin-top:10px">
+        <div class="card" style="text-align:center">
+            <div class="card-label">Ping</div>
+            <div class="card-value" style="font-size:26px" data-field="n-ping">--<span class="card-unit">ms</span></div>
+        </div>
+        <div class="card" style="text-align:center">
+            <div class="card-label">Jitter</div>
+            <div class="card-value" style="font-size:26px" data-field="n-jitter">--<span class="card-unit">ms</span></div>
+        </div>
+        <div class="card" style="text-align:center">
+            <div class="card-label">Packet Loss</div>
+            <div class="card-value" style="font-size:26px" data-field="n-loss">--<span class="card-unit">%</span></div>
+        </div>
+    </div>
+
+    <div class="card" id="speed-chart-card">
+        <div class="card-label">Andamento Velocità (24h)</div>
+        <div class="chart-wrap"><canvas id="speed-chart"></canvas></div>
+        <div class="chart-legend">
+            <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--green)"></div> Download</div>
+            <div class="chart-legend-item"><div class="chart-legend-dot" style="background:var(--blue)"></div> Upload</div>
+        </div>
+    </div>
+</div>
+</div> <!-- /pages-container -->
+
+<!-- ===== Navbar ===== -->
+<nav class="navbar">
+    <button class="nav-tab active" onclick="switchPage('pc', 0)" id="tab0">
+        <span class="icon">💻</span> PC
+    </button>
+    <button class="nav-tab" onclick="switchPage('meteo', 1)" id="tab1">
+        <span class="icon">🌤️</span> Meteo
+    </button>
+    <button class="nav-tab" onclick="switchPage('rete', 2)" id="tab2">
+        <span class="icon">📶</span> Rete
+    </button>
+</nav>
+
+<script>
+// ===================== CONFIGURAZIONE =====================
+const INFLUX_URL = 'http://192.168.1.28:8086';
+const REFRESH_MS = 1000;
+// ==========================================================
+
+let currentPage = 'pc';
+let currentPageIdx = 0;
+const sparkData = { cpu: [], gpu: [] };
+const SPARK_MAX = 60;
+let animating = false;
+let resizeTimer;
+
+// ===== DOM CACHE =====
+const $ = id => document.getElementById(id);
+const fieldCache = {};
+function getFieldEls(field) {
+    if (!fieldCache[field]) fieldCache[field] = document.querySelectorAll('[data-field="' + field + '"]');
+    return fieldCache[field];
+}
+const statusDot = $('statusDot');
+const diskContainer = $('disk-container');
+const weatherIconMain = $('weather-icon-main');
+const windArrow = $('wind-arrow');
+const forecastStrip = $('forecast-strip');
+const barCpu = $('bar-cpu');
+const barGpu = $('bar-gpu');
+const barRam = $('bar-ram');
+const barVram = $('bar-vram');
+const sparkCpuSvg = $('spark-cpu');
+const sparkGpuSvg = $('spark-gpu');
+const sparkCpuWrap = $('spark-cpu-wrap');
+const sparkGpuWrap = $('spark-gpu-wrap');
+const toggleCpuSpark = $('toggle-cpu-spark');
+const toggleGpuSpark = $('toggle-gpu-spark');
+const speedCanvas = $('speed-chart');
+const speedCtx = speedCanvas ? speedCanvas.getContext('2d') : null;
+const gaugeCache = {};
+function getGaugeFill(id) {
+    if (!gaugeCache[id]) {
+        const ring = $(id);
+        if (ring) gaugeCache[id] = ring.querySelector('.fill');
+    }
+    return gaugeCache[id];
+}
+const navTabs = document.querySelectorAll('.nav-tab');
+const pageEls = { pc: $('page-pc'), meteo: $('page-meteo'), rete: $('page-rete') };
+
+// ===== SPARKLINE TOGGLE =====
+function toggleSpark(key) {
+    const wrap = key === 'cpu' ? sparkCpuWrap : sparkGpuWrap;
+    const btn = key === 'cpu' ? toggleCpuSpark : toggleGpuSpark;
+    if (!wrap || !btn) return;
+    const isOpen = wrap.classList.contains('open') || wrap.classList.contains('auto-open');
+    wrap.classList.remove('auto-open');
+    btn.classList.remove('auto-open');
+    wrap.classList.toggle('open', !isOpen);
+    btn.classList.toggle('open', !isOpen);
+}
+
+function initSparkAutoOpen() {
+    const tall = window.innerHeight >= 700;
+    [sparkCpuWrap, sparkGpuWrap].forEach(w => {
+        if (!w) return;
+        if (tall && !w.classList.contains('open')) w.classList.add('auto-open');
+        else w.classList.remove('auto-open');
+    });
+    [toggleCpuSpark, toggleGpuSpark].forEach(b => {
+        if (!b) return;
+        if (tall && !b.classList.contains('open')) b.classList.add('auto-open');
+        else b.classList.remove('auto-open');
+    });
+}
+initSparkAutoOpen();
+window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { initSparkAutoOpen(); if (currentPage === 'rete') fetchRete(); }, 150); });
+
+// ===== NAVIGAZIONE =====
+function switchPage(page, idx, direction) {
+    if (page === currentPage || animating) return;
+    animating = true;
+    if (direction === undefined) direction = idx > currentPageIdx ? 'left' : 'right';
+
+    const oldPage = pageEls[currentPage];
+    const newPage = pageEls[page];
+
+    newPage.style.transition = 'none';
+    newPage.style.transform = direction === 'left' ? 'translateX(100%)' : 'translateX(-100%)';
+    newPage.style.opacity = '0';
+    newPage.classList.add('active');
+    void newPage.offsetWidth;
+
+    newPage.style.transition = '';
+    oldPage.classList.remove('active');
+    oldPage.classList.add(direction === 'left' ? 'exit-left' : 'exit-right');
+    newPage.style.transform = 'translateX(0)';
+    newPage.style.opacity = '1';
+
+    currentPage = page;
+    currentPageIdx = idx;
+    for (let i = 0; i < navTabs.length; i++) navTabs[i].classList.toggle('active', i === idx);
+
+    setTimeout(() => {
+        oldPage.classList.remove('exit-left', 'exit-right');
+        oldPage.style.transform = '';
+        oldPage.style.opacity = '';
+        newPage.style.transform = '';
+        newPage.style.opacity = '';
+        animating = false;
+        fetchAll();
+    }, 320);
+}
+
+// ===== QUERY INFLUXDB =====
+async function influxQuery(db, q) {
+    try {
+        const url = `${INFLUX_URL}/query?db=${db}&q=${encodeURIComponent(q)}&epoch=s`;
+        const r = await fetch(url, { signal: AbortSignal.timeout(4000) });
+        if (!r.ok) throw new Error(r.status);
+        return (await r.json()).results || [];
+    } catch (e) {
+        console.warn('Query error:', e.message);
+        return null;
+    }
+}
+
+function extractValue(results, seriesIdx, colIdx) {
+    try {
+        const vals = results[0]?.series?.[seriesIdx]?.values;
+        if (!vals || !vals.length) return null;
+        const v = vals[vals.length - 1][colIdx];
+        return v === null || v === undefined ? null : v;
+    } catch { return null; }
+}
+
+function extractSeries(results, seriesIdx, colIdx) {
+    try { return results[0]?.series?.[seriesIdx]?.values?.map(r => r[colIdx]) || []; }
+    catch { return []; }
+}
+
+function extractAllSeries(results) {
+    try { return results[0]?.series || []; }
+    catch { return []; }
+}
+
+// ===== DISPLAY HELPERS =====
+function setText(field, html) {
+    const els = getFieldEls(field);
+    const isNull = html.charAt(0) === '-' && html.charAt(1) === '-';
+    for (let i = 0; i < els.length; i++) {
+        els[i].innerHTML = html;
+        els[i].classList.toggle('null-value', isNull);
+    }
+}
+
+function setVal(field, val, decimals, unit) {
+    if (val === null || val === undefined || isNaN(val)) {
+        setText(field, '--' + (unit ? `<span class="card-unit">${unit}</span>` : ''));
+        return null;
+    }
+    const n = Number(val).toFixed(decimals);
+    setText(field, n + (unit ? `<span class="card-unit">${unit}</span>` : ''));
+    return Number(n);
+}
+
+function tempColor(t) {
+    if (t == null) return 'rgba(255,255,255,0.15)';
+    if (t < 45) return 'var(--green)';
+    if (t < 65) return 'var(--yellow)';
+    if (t < 80) return 'var(--orange)';
+    return 'var(--red)';
+}
+
+function pctColor(p) {
+    if (p == null) return 'rgba(255,255,255,0.15)';
+    if (p < 60) return 'var(--green)';
+    if (p < 80) return 'var(--yellow)';
+    if (p < 90) return 'var(--orange)';
+    return 'var(--red)';
+}
+
+function speedColor(v) {
+    if (v == null) return 'var(--text-dim)';
+    if (v >= 50) return 'var(--green)';
+    if (v >= 20) return 'var(--yellow)';
+    if (v >= 5) return 'var(--orange)';
+    return 'var(--red)';
+}
+
+// ===== GAUGE RING =====
+function updateGauge(id, val, max, colorFn) {
+    const circle = getGaugeFill(id);
+    if (!circle) return;
+    const pct = val != null ? Math.min(val / max, 1) : 0;
+    circle.style.strokeDashoffset = 264 - (pct * 264);
+    circle.style.stroke = colorFn(val);
+}
+
+// ===== SPARKLINE =====
+function pushSpark(key, val) {
+    if (!sparkData[key]) sparkData[key] = [];
+    sparkData[key].push(val === null ? NaN : val);
+    if (sparkData[key].length > SPARK_MAX) sparkData[key].shift();
+}
+
+function drawSparkline(svgEl, key, color) {
+    if (!svgEl) return;
+    const data = sparkData[key];
+    if (!data || data.length < 2) { svgEl.innerHTML = ''; return; }
+
+    // Determine min/max. For CPU/GPU we fix to 0..100 to keep scale stable.
+    let min = Infinity, max = -Infinity, hasValid = false;
+    for (let i = 0; i < data.length; i++) {
+        if (!isNaN(data[i])) { if (data[i] < min) min = data[i]; if (data[i] > max) max = data[i]; hasValid = true; }
+    }
+    if (!hasValid) { svgEl.innerHTML = ''; return; }
+
+    if (key === 'cpu' || key === 'gpu') {
+        min = 0; max = 100;
+    }
+
+    const range = max - min || 1;
+    // Use actual svg element size so drawing matches visible height
+    const rect = svgEl.getBoundingClientRect();
+    const w = Math.max(1, Math.round(rect.width || 200));
+    const h = Math.max(1, Math.round(rect.height || 40));
+    // Ensure SVG internal coordinate system matches the pixel size we draw into
+    try {
+        svgEl.setAttribute('viewBox', `0 0 ${w} ${h}`);
+        svgEl.setAttribute('preserveAspectRatio', 'none');
+    } catch (e) { /* ignore on older browsers */ }
+    const pad = Math.max(4, Math.round(h * 0.04));
+    const step = w / Math.max(1, (data.length - 1));
+
+    let pathD = '', areaD = '', started = false, lastValidX = 0;
+    for (let i = 0; i < data.length; i++) {
+        if (isNaN(data[i])) continue;
+        const x = i * step;
+        const y = pad + (h - 2 * pad) * (1 - (data[i] - min) / range);
+        if (!started) { pathD = 'M' + x + ',' + y; areaD = 'M' + x + ',' + h + ' L' + x + ',' + y; started = true; }
+        else { pathD += ' L' + x + ',' + y; areaD += ' L' + x + ',' + y; }
+        lastValidX = x;
+    }
+    areaD += ' L' + lastValidX + ',' + h + ' Z';
+
+    svgEl.innerHTML = '<defs><linearGradient id="g-' + key + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" style="stop-color:' + color + ';stop-opacity:0.4"/><stop offset="100%" style="stop-color:' + color + ';stop-opacity:0"/></linearGradient></defs><path d="' + areaD + '" fill="url(#g-' + key + ')"/><path d="' + pathD + '" fill="none" stroke="' + color + '" stroke-width="1.5"/>';
+}
+
+// ===== BAR =====
+function updateBar(bar, pct, colorFn) {
+    if (!bar) return;
+    bar.style.width = (pct != null ? Math.min(pct, 100) : 0) + '%';
+    bar.style.background = colorFn(pct);
+}
+
+// ===== WEATHER SVG ICONS (animated) =====
+function getWeatherSVG(code) {
+    if (code == null) return '<div style="font-size:60px;opacity:0.15">?</div>';
+    const c = Number(code);
+
+    const sunRays = (cx, cy, r1, r2, n) => {
+        let s = '';
+        for (let i = 0; i < n; i++) {
+            const a = (360 / n) * i * Math.PI / 180;
+            s += `<line x1="${cx+r1*Math.cos(a)}" y1="${cy+r1*Math.sin(a)}" x2="${cx+r2*Math.cos(a)}" y2="${cy+r2*Math.sin(a)}" stroke="#FBBF24" stroke-width="3" stroke-linecap="round" opacity="0.7"/>`;
+        }
+        return s;
+    };
+
+    // Sereno
+    if (c === 0) return `<svg viewBox="0 0 120 120" class="weather-anim">
+        <circle cx="60" cy="60" r="24" fill="#FBBF24" opacity="0.9"/>
+        <circle cx="60" cy="60" r="30" fill="none" stroke="#FBBF24" stroke-width="2" opacity="0.3"/>
+        ${sunRays(60,60,38,50,8)}</svg>`;
+
+    // Parzialmente nuvoloso
+    if (c >= 1 && c <= 2) return `<svg viewBox="0 0 120 120">
+        <g class="weather-anim"><circle cx="42" cy="42" r="18" fill="#FBBF24" opacity="0.8"/>${sunRays(42,42,24,32,6)}</g>
+        <g class="cloud-drift"><circle cx="62" cy="68" r="16" fill="#CBD5E1"/><circle cx="78" cy="68" r="14" fill="#CBD5E1"/>
+        <circle cx="70" cy="58" r="12" fill="#CBD5E1"/><rect x="56" y="68" width="30" height="14" rx="6" fill="#CBD5E1"/></g></svg>`;
+
+    // Coperto
+    if (c === 3) return `<svg viewBox="0 0 120 120">
+        <g class="cloud-drift"><circle cx="50" cy="55" r="20" fill="#94A3B8"/><circle cx="72" cy="55" r="17" fill="#94A3B8"/>
+        <circle cx="60" cy="44" r="15" fill="#94A3B8"/><rect x="38" y="55" width="44" height="18" rx="8" fill="#94A3B8"/></g>
+        <g class="cloud-drift" style="animation-delay:-2s;opacity:0.4"><circle cx="38" cy="78" r="10" fill="#64748B"/>
+        <circle cx="52" cy="78" r="8" fill="#64748B"/><rect x="32" y="78" width="26" height="10" rx="5" fill="#64748B"/></g></svg>`;
+
+    // Nebbia
+    if (c === 45 || c === 48) return `<svg viewBox="0 0 120 120">
+        ${[40,55,70,85].map((y,i) => `<line x1="20" y1="${y}" x2="100" y2="${y}" stroke="#94A3B8" stroke-width="4" stroke-linecap="round" opacity="${0.7-i*0.15}" style="animation:pulse 2s ease-in-out infinite;animation-delay:${i*0.3}s"/>`).join('')}</svg>`;
+
+    // Pioggerella
+    if (c >= 51 && c <= 57) return `<svg viewBox="0 0 120 120">
+        <g class="cloud-drift"><circle cx="50" cy="42" r="18" fill="#94A3B8"/><circle cx="70" cy="42" r="15" fill="#94A3B8"/>
+        <circle cx="58" cy="32" r="12" fill="#94A3B8"/><rect x="38" y="42" width="40" height="14" rx="6" fill="#94A3B8"/></g>
+        ${[48,58,68].map((x,i) => `<line x1="${x}" y1="64" x2="${x-2}" y2="76" stroke="#60A5FA" stroke-width="1.5" stroke-linecap="round" class="rain-anim" style="animation-delay:${i*0.3}s"/>`).join('')}</svg>`;
+
+    // Pioggia / Rovesci
+    if ((c >= 61 && c <= 67) || (c >= 80 && c <= 82)) return `<svg viewBox="0 0 120 120">
+        <g class="cloud-drift"><circle cx="48" cy="38" r="20" fill="#64748B"/><circle cx="72" cy="38" r="17" fill="#64748B"/>
+        <circle cx="58" cy="26" r="14" fill="#64748B"/><rect x="36" y="38" width="44" height="16" rx="7" fill="#64748B"/></g>
+        ${[40,52,64,76].map((x,i) => `<line x1="${x}" y1="62" x2="${x-4}" y2="82" stroke="#3B82F6" stroke-width="2.5" stroke-linecap="round" class="rain-anim" style="animation-delay:${i*0.2}s"/>`).join('')}</svg>`;
+
+    // Neve
+    if ((c >= 71 && c <= 77) || (c >= 85 && c <= 86)) return `<svg viewBox="0 0 120 120">
+        <g class="cloud-drift"><circle cx="50" cy="38" r="18" fill="#94A3B8"/><circle cx="70" cy="38" r="15" fill="#94A3B8"/>
+        <circle cx="58" cy="28" r="12" fill="#94A3B8"/><rect x="38" y="38" width="38" height="14" rx="6" fill="#94A3B8"/></g>
+        ${[42,56,70,48,64].map((x,i) => `<circle cx="${x}" cy="${68+i*4}" r="3" fill="white" opacity="0.9" class="snow-anim" style="animation-delay:${i*0.4}s"/>`).join('')}</svg>`;
+
+    // Temporale
+    if (c >= 95) return `<svg viewBox="0 0 120 120">
+        <g class="cloud-drift"><circle cx="48" cy="36" r="22" fill="#475569"/><circle cx="74" cy="36" r="18" fill="#475569"/>
+        <circle cx="58" cy="22" r="16" fill="#475569"/><rect x="34" y="36" width="48" height="18" rx="8" fill="#475569"/></g>
+        <polygon points="58,58 50,78 56,78 48,98 66,72 58,72 66,58" fill="#FBBF24" class="lightning-anim"/>
+        ${[42,72].map((x,i) => `<line x1="${x}" y1="62" x2="${x-3}" y2="80" stroke="#3B82F6" stroke-width="2" stroke-linecap="round" class="rain-anim" style="animation-delay:${i*0.3}s"/>`).join('')}</svg>`;
+
+    // Default nuvoloso
+    return `<svg viewBox="0 0 120 120"><g class="cloud-drift"><circle cx="50" cy="55" r="20" fill="#94A3B8"/>
+        <circle cx="72" cy="55" r="16" fill="#94A3B8"/><circle cx="60" cy="44" r="14" fill="#94A3B8"/>
+        <rect x="38" y="55" width="40" height="16" rx="7" fill="#94A3B8"/></g></svg>`;
+}
+
+function getWeatherEmoji(code) {
+    if (code == null) return '❓';
+    const c = Number(code);
+    if (c === 0) return '☀️';
+    if (c <= 2) return '⛅';
+    if (c === 3) return '☁️';
+    if (c === 45 || c === 48) return '🌫️';
+    if (c >= 51 && c <= 57) return '🌦️';
+    if ((c >= 61 && c <= 67) || (c >= 80 && c <= 82)) return '🌧️';
+    if ((c >= 71 && c <= 77) || (c >= 85 && c <= 86)) return '❄️';
+    if (c >= 95) return '⛈️';
+    return '☁️';
+}
+
+// ===== FETCH: PC HARDWARE =====
+async function fetchPC() {
+    const [temps, cpuRes, memRes, diskRes, gpuRes] = await Promise.all([
+        influxQuery('pc_metrics', 'SELECT last("value") FROM "hardware_temps" WHERE time > now() - 5m GROUP BY "sensor"'),
+        influxQuery('pc_metrics', 'SELECT mean("Percent_Processor_Time") FROM "cpu" WHERE time > now() - 5m GROUP BY time(10s) fill(null)'),
+        influxQuery('pc_metrics', 'SELECT last("Available_MBytes"),last("Percent_Committed_Bytes_In_Use") FROM "mem" WHERE time > now() - 5m'),
+        influxQuery('pc_metrics', 'SELECT last("Percent_Free_Space"),last("Free_Megabytes") FROM "disk" WHERE time > now() - 5m GROUP BY "instance"'),
+        influxQuery('pc_metrics', 'SELECT last("utilization"),last("memory_utilization"),last("memory_used"),last("memory_total"),last("power_draw"),last("fan_speed"),last("clock_graphics") FROM "gpu" WHERE time > now() - 30m')
+    ]);
+
+    if (!temps && !cpuRes && !memRes && !gpuRes) return false;
+
+    // Temperature
+    let cpuT = null, gpuT = null, ssdT = null;
+    if (temps) {
+        extractAllSeries(temps).forEach(s => {
+            const tag = s.tags?.sensor;
+            const val = s.values?.[s.values.length-1]?.[1] ?? null;
+            if (tag === 'cpu_temp') cpuT = val;
+            if (tag === 'gpu_temp') gpuT = val;
+            if (tag === 'disk_temp') ssdT = val;
+        });
+    }
+    setVal('cpu-temp', cpuT, 0, '');
+    setVal('gpu-temp', gpuT, 0, '');
+    setVal('ssd-temp', ssdT, 0, '');
+    updateGauge('gauge-cpu-temp', cpuT, 100, tempColor);
+    updateGauge('gauge-gpu-temp', gpuT, 100, tempColor);
+    updateGauge('gauge-ssd-temp', ssdT, 80, tempColor);
+
+    // CPU Usage
+    if (cpuRes) {
+        const vals = extractSeries(cpuRes, 0, 1).filter(v => v !== null && v !== undefined);
+        const last = vals.length ? vals[vals.length-1] : null;
+        const cpuPct = setVal('cpu-usage', last, 1, '%');
+        updateBar(barCpu, cpuPct, pctColor);
+        pushSpark('cpu', cpuPct);
+        drawSparkline(sparkCpuSvg, 'cpu', 'var(--accent)');
+    }
+
+    // RAM
+    if (memRes) {
+        const avail = extractValue(memRes, 0, 1);
+        const pctUsed = extractValue(memRes, 0, 2);
+        const ramPct = setVal('ram-usage', pctUsed, 1, '%');
+        updateBar(barRam, ramPct, pctColor);
+        setText('ram-avail', avail != null ? `${(avail / 1024).toFixed(1)} GB disponibili` : '');
+    }
+
+    // GPU
+    if (gpuRes) {
+        const gpuUtil = extractValue(gpuRes, 0, 1);
+        const memUtil = extractValue(gpuRes, 0, 2);
+        const memUsed = extractValue(gpuRes, 0, 3);
+        const memTotal = extractValue(gpuRes, 0, 4);
+        const powerDraw = extractValue(gpuRes, 0, 5);
+        const fanSpeed = extractValue(gpuRes, 0, 6);
+        const clockGfx = extractValue(gpuRes, 0, 7);
+
+        const gpuPct = setVal('gpu-usage', gpuUtil, 0, '%');
+        updateBar(barGpu, gpuPct, pctColor);
+        pushSpark('gpu', gpuPct);
+        drawSparkline(sparkGpuSvg, 'gpu', 'var(--purple)');
+
+        // VRAM
+        const vramPct = setVal('vram-usage', memUtil, 0, '%');
+        updateBar(barVram, vramPct, pctColor);
+        if (memUsed != null && memTotal != null) {
+            setText('vram-detail', `${(memUsed / 1024).toFixed(1)} / ${(memTotal / 1024).toFixed(1)} GB`);
+        } else {
+            setText('vram-detail', '');
+        }
+
+        // GPU Info cards — nascondi riga se tutti i valori sono 0 o null (AMD senza sensori)
+        const hasPower = powerDraw != null && powerDraw > 0;
+        const hasFan = fanSpeed != null && fanSpeed > 0;
+        const hasClock = clockGfx != null && clockGfx > 0;
+        const gpuInfoGrid = $('gpu-info-grid');
+        if (gpuInfoGrid) {
+            if (hasPower || hasFan || hasClock) {
+                gpuInfoGrid.style.display = '';
+                setVal('gpu-power', hasPower ? powerDraw : null, 1, '<span class="card-unit">W</span>');
+                setVal('gpu-fan', hasFan ? fanSpeed : null, 0, '<span class="card-unit">%</span>');
+                setVal('gpu-clock', hasClock ? clockGfx : null, 0, '<span class="card-unit">MHz</span>');
+            } else {
+                gpuInfoGrid.style.display = 'none';
+            }
+        }
+    }
+
+    // Dischi
+    if (diskRes) {
+        let html = '';
+        extractAllSeries(diskRes).forEach(s => {
+            const inst = s.tags?.instance || '?';
+            if (inst === '_Total') return;
+            const freeP = s.values?.[s.values.length-1]?.[1] ?? null;
+            const freeMB = s.values?.[s.values.length-1]?.[2] ?? null;
+            const usedP = freeP != null ? (100 - freeP).toFixed(1) : null;
+            const freeGB = freeMB != null ? (freeMB / 1024).toFixed(1) : '--';
+            const color = pctColor(usedP != null ? Number(usedP) : null);
+            html += `<div class="card">
+                <div style="display:flex;justify-content:space-between;align-items:center">
+                    <span class="disk-label">${inst}</span>
+                    <span class="disk-pct" style="color:${color}">${usedP ?? '--'}%</span>
+                </div>
+                <div class="bar-container">
+                    <div class="bar-fill" style="width:${usedP ?? 0}%;background:${color}"></div>
+                </div>
+                <div class="card-sub">${freeGB} GB liberi</div>
+            </div>`;
+        });
+        diskContainer.innerHTML = html;
+    }
+    return true;
+}
+
+// ===== FETCH: METEO =====
+async function fetchMeteo() {
+    const [currentRes, forecastRes] = await Promise.all([
+        influxQuery('weather', 'SELECT last("temperature") AS "temperature",last("feels_like") AS "feels_like",last("humidity") AS "humidity",last("wind_speed") AS "wind_speed",last("wind_deg") AS "wind_deg",last("pressure") AS "pressure",last("clouds") AS "clouds",last("weather_code") AS "weather_code",last("description") AS "description",last("temp_min") AS "temp_min",last("temp_max") AS "temp_max",last("sunrise") AS "sunrise",last("sunset") AS "sunset" FROM "current_weather" WHERE time > now() - 2h'),
+        influxQuery('weather', 'SELECT "temperature","pop","weather_code" FROM "weather_forecast" WHERE time > now() ORDER BY time ASC LIMIT 24')
+    ]);
+
+    if (!currentRes) return false;
+
+    const s = currentRes[0]?.series?.[0];
+    if (s) {
+        const v = s.values[s.values.length - 1];
+        const cols = s.columns;
+        const get = (name) => { const i = cols.indexOf(name); return i >= 0 ? v[i] : null; };
+        const getStr = (name) => { const val = get(name); return typeof val === 'string' ? val.replace(/^"|"$/g, '') : val; };
+
+        const temp = get('temperature');
+        const feels = get('feels_like');
+        const humidity = get('humidity');
+        const wind = get('wind_speed');
+        const windDeg = get('wind_deg');
+        const pressure = get('pressure');
+        const clouds = get('clouds');
+        const code = get('weather_code');
+        const desc = getStr('description');
+        const tmin = get('temp_min');
+        const tmax = get('temp_max');
+        const sunrise = getStr('sunrise');
+        const sunset = getStr('sunset');
+
+        setText('w-temp', temp != null ? `${Math.round(temp)}°` : '--°');
+        setText('w-desc', desc ? desc.replace(/_/g, ' ') : '--');
+        setText('w-feels', feels != null ? `Percepita: ${Math.round(feels)}°` : 'Percepita: --°');
+        setText('w-humidity', humidity != null ? `${Math.round(humidity)}%` : '--%');
+        setText('w-wind', wind != null ? `${(wind * 3.6).toFixed(0)} km/h` : '-- km/h');
+        setText('w-pressure', pressure != null ? `${Math.round(pressure)}` : '--');
+        setText('w-clouds', clouds != null ? `${Math.round(clouds)}%` : '--%');
+        setText('w-min', tmin != null ? `${Math.round(tmin)}°` : '--°');
+        setText('w-max', tmax != null ? `${Math.round(tmax)}°` : '--°');
+        setText('w-sunrise', sunrise || '--');
+        setText('w-sunset', sunset || '--');
+
+        if (windDeg != null) windArrow.style.transform = 'rotate(' + windDeg + 'deg)';
+        weatherIconMain.innerHTML = getWeatherSVG(code);
+    }
+
+    // Previsioni 24h
+    if (forecastRes) {
+        const fSeries = forecastRes[0]?.series?.[0];
+        if (fSeries) {
+            let html = '';
+            fSeries.values.forEach(row => {
+                const [ts, fTemp, fPop, fCode] = row;
+                const h = new Date(ts * 1000).getHours().toString().padStart(2, '0') + ':00';
+                html += `<div class="forecast-item">
+                    <div class="f-time">${h}</div>
+                    <div class="f-icon">${getWeatherEmoji(fCode)}</div>
+                    <div class="f-temp">${fTemp != null ? Math.round(fTemp) + '°' : '--°'}</div>
+                    <div class="f-pop">${fPop != null && fPop > 0 ? '💧' + Math.round(fPop) + '%' : ''}</div>
+                </div>`;
+            });
+            forecastStrip.innerHTML = html;
+        }
+    }
+    return true;
+}
+
+// ===== SPEED HISTORY CHART =====
+function drawSpeedChart(dlData, ulData, times) {
+    if (!speedCanvas || !speedCtx) return;
+    const ctx = speedCtx;
+    const dpr = window.devicePixelRatio || 1;
+    const rect = speedCanvas.parentElement.getBoundingClientRect();
+    if (rect.width < 10 || rect.height < 10) return;
+    speedCanvas.width = rect.width * dpr;
+    speedCanvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    const W = rect.width, H = rect.height;
+    ctx.clearRect(0, 0, W, H);
+
+    if (!dlData.length && !ulData.length) {
+        ctx.fillStyle = 'rgba(255,255,255,0.15)';
+        ctx.font = '13px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('Nessun dato disponibile', W / 2, H / 2);
+        return;
+    }
+
+    const padTop = 16, padBottom = 26, padLeft = 38, padRight = 10;
+    const plotW = W - padLeft - padRight;
+    const plotH = H - padTop - padBottom;
+    const n = Math.max(dlData.length, ulData.length);
+    const allVals = [...dlData, ...ulData].filter(v => v != null);
+    let maxV = 1;
+    for (let i = 0; i < allVals.length; i++) if (allVals[i] > maxV) maxV = allVals[i];
+    const maxVal = Math.ceil(maxV * 1.15);
+
+    // Grid lines + Y labels
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= 4; i++) {
+        const y = padTop + (plotH / 4) * i;
+        ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(padLeft, y);
+        ctx.lineTo(W - padRight, y);
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(255,255,255,0.25)';
+        ctx.font = '9px Inter, sans-serif';
+        ctx.fillText(Math.round(maxVal * (4 - i) / 4), padLeft - 4, y);
+    }
+
+    // X labels
+    if (times.length > 1) {
+        ctx.fillStyle = 'rgba(255,255,255,0.25)';
+        ctx.font = '9px Inter, sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const step = Math.max(1, Math.floor(times.length / 6));
+        for (let i = 0; i < times.length; i += step) {
+            const x = padLeft + (i / (n - 1)) * plotW;
+            const d = new Date(times[i] * 1000);
+            ctx.fillText(d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0'), x, H - padBottom + 6);
+        }
+    }
+
+    function drawLine(data, strokeColor, fillColor) {
+        if (data.length < 2) return;
+        const valid = data.filter(v => v != null);
+        if (!valid.length) return;
+        // Area
+        ctx.beginPath();
+        let started = false;
+        data.forEach((v, i) => {
+            if (v == null) return;
+            const x = padLeft + (i / (n - 1)) * plotW;
+            const y = padTop + plotH * (1 - v / maxVal);
+            if (!started) { ctx.moveTo(x, padTop + plotH); ctx.lineTo(x, y); started = true; }
+            else ctx.lineTo(x, y);
+        });
+        for (let i = data.length - 1; i >= 0; i--) {
+            if (data[i] != null) { ctx.lineTo(padLeft + (i / (n - 1)) * plotW, padTop + plotH); break; }
+        }
+        ctx.closePath();
+        ctx.fillStyle = fillColor;
+        ctx.fill();
+        // Stroke
+        ctx.beginPath();
+        started = false;
+        data.forEach((v, i) => {
+            if (v == null) return;
+            const x = padLeft + (i / (n - 1)) * plotW;
+            const y = padTop + plotH * (1 - v / maxVal);
+            if (!started) { ctx.moveTo(x, y); started = true; }
+            else ctx.lineTo(x, y);
+        });
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = 2;
+        ctx.stroke();
+        // Dots
+        if (data.length <= 60) {
+            data.forEach((v, i) => {
+                if (v == null) return;
+                const x = padLeft + (i / (n - 1)) * plotW;
+                const y = padTop + plotH * (1 - v / maxVal);
+                ctx.beginPath();
+                ctx.arc(x, y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = strokeColor;
+                ctx.fill();
+            });
+        }
+    }
+
+    drawLine(dlData, '#22c55e', 'rgba(34,197,94,0.1)');
+    drawLine(ulData, '#38bdf8', 'rgba(56,189,248,0.1)');
+}
+
+// ===== FETCH: RETE =====
+async function fetchRete() {
+    const [speedRes, historyRes] = await Promise.all([
+        influxQuery('pc_metrics', 'SELECT last("download_mbps"),last("upload_mbps"),last("ping_ms"),last("jitter_ms"),last("packet_loss") FROM "speedtest" WHERE time > now() - 30m'),
+        influxQuery('pc_metrics', 'SELECT "download_mbps","upload_mbps" FROM "speedtest" WHERE time > now() - 24h ORDER BY time ASC')
+    ]);
+
+    if (!speedRes && !historyRes) return false;
+
+    if (speedRes) {
+        const dl = extractValue(speedRes, 0, 1);
+        const ul = extractValue(speedRes, 0, 2);
+        const ping = extractValue(speedRes, 0, 3);
+        const jitter = extractValue(speedRes, 0, 4);
+        const loss = extractValue(speedRes, 0, 5);
+
+        setVal('n-download', dl, 1, '');
+        setVal('n-upload', ul, 1, '');
+        setVal('n-ping', ping, 1, '<span class="card-unit">ms</span>');
+        setVal('n-jitter', jitter, 1, '<span class="card-unit">ms</span>');
+        setVal('n-loss', loss, 1, '<span class="card-unit">%</span>');
+
+        const dlEl = getFieldEls('n-download')[0];
+        if (dlEl) dlEl.style.color = speedColor(dl);
+        const ulEl = getFieldEls('n-upload')[0];
+        if (ulEl) ulEl.style.color = speedColor(ul);
+    }
+
+    // Draw history chart
+    if (historyRes) {
+        const series = historyRes[0]?.series?.[0];
+        if (series && series.values) {
+            const times = series.values.map(r => r[0]);
+            const dlHist = series.values.map(r => r[1]);
+            const ulHist = series.values.map(r => r[2]);
+            drawSpeedChart(dlHist, ulHist, times);
+        } else {
+            drawSpeedChart([], [], []);
+        }
+    }
+
+    return true;
+}
+
+// ===== FETCH ALL =====
+let fetchOk = true;
+async function fetchAll() {
+    try {
+        let ok = true;
+        if (currentPage === 'pc') ok = await fetchPC();
+        else if (currentPage === 'meteo') ok = await fetchMeteo();
+        else if (currentPage === 'rete') ok = await fetchRete();
+        fetchOk = ok !== false;
+    } catch (e) {
+        console.warn('Fetch error:', e);
+        fetchOk = false;
+    }
+    statusDot.classList.toggle('error', !fetchOk);
+}
+
+// ===== WAKE LOCK =====
+async function preventSleep() {
+    try { if ('wakeLock' in navigator) await navigator.wakeLock.request('screen'); } catch {}
+}
+
+// ===== SWIPE NAVIGATION =====
+const pages = ['pc', 'meteo', 'rete'];
+let touchStartX = 0, touchStartY = 0, touchStartTime = 0;
+const SWIPE_THRESHOLD = 50;
+const SWIPE_MAX_Y = 80;
+const SWIPE_MAX_TIME = 400;
+
+document.addEventListener('touchstart', e => {
+    if (e.target.closest('.navbar') || e.target.closest('.forecast-strip')) return;
+    touchStartX = e.changedTouches[0].clientX;
+    touchStartY = e.changedTouches[0].clientY;
+    touchStartTime = Date.now();
+}, { passive: true });
+
+document.addEventListener('touchend', e => {
+    if (e.target.closest('.navbar') || e.target.closest('.forecast-strip')) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+    const dt = Date.now() - touchStartTime;
+    if (dt > SWIPE_MAX_TIME || dy > SWIPE_MAX_Y || Math.abs(dx) < SWIPE_THRESHOLD) return;
+    const idx = pages.indexOf(currentPage);
+    if (dx < 0 && idx < pages.length - 1) {
+        switchPage(pages[idx + 1], idx + 1, 'left');
+    } else if (dx > 0 && idx > 0) {
+        switchPage(pages[idx - 1], idx - 1, 'right');
+    }
+}, { passive: true });
+
+// ===== INIT =====
+preventSleep();
+fetchAll();
+setInterval(fetchAll, REFRESH_MS);
+document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
+window.addEventListener('orientationchange', () => setTimeout(fetchAll, 300));
+
+// ===== KEYBOARD NAVIGATION (desktop) =====
+document.addEventListener('keydown', (e) => {
+    const idx = pages.indexOf(currentPage);
+    if (e.key === 'ArrowRight' && idx < pages.length - 1) {
+        switchPage(pages[idx + 1], idx + 1, 'left');
+    } else if (e.key === 'ArrowLeft' && idx > 0) {
+        switchPage(pages[idx - 1], idx - 1, 'right');
+    } else if (e.key >= '1' && e.key <= '3') {
+        const target = Number(e.key) - 1;
+        if (target !== idx) switchPage(pages[target], target);
+    }
+});
+
+// ===== FORECAST STRIP: DRAG + WHEEL SCROLL =====
+(function() {
+    const strip = forecastStrip;
+    if (!strip) return;
+
+    // Mouse wheel → horizontal scroll
+    strip.addEventListener('wheel', (e) => {
+        if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+            e.preventDefault();
+            strip.scrollLeft += e.deltaY;
+        }
+    }, { passive: false });
+
+    // Mouse drag to scroll
+    let isDragging = false, startX = 0, scrollStart = 0;
+
+    strip.addEventListener('mousedown', (e) => {
+        isDragging = true;
+        startX = e.pageX - strip.offsetLeft;
+        scrollStart = strip.scrollLeft;
+        strip.classList.add('dragging');
+    });
+
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        const x = e.pageX - strip.offsetLeft;
+        strip.scrollLeft = scrollStart - (x - startX);
+    });
+
+    document.addEventListener('mouseup', () => {
+        if (isDragging) {
+            isDragging = false;
+            strip.classList.remove('dragging');
+        }
+    });
+
+    strip.addEventListener('mouseleave', () => {
+        if (isDragging) {
+            isDragging = false;
+            strip.classList.remove('dragging');
+        }
+    });
+})();
+</script>
+</body>
+</html>
