@@ -1,0 +1,19 @@
+```gitignore
+# Python (eventuale)
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs e temporanei
+*.log
+*.tmp
+
+# PowerShell
+*.ps1.old
+
+# IDE
+.vscode/
+.idea/
+
+# Grafana JSON/Temp cache se presente
+*.cache
