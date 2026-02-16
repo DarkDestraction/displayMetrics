@@ -1,179 +1,110 @@
-## Huawei Y6 2019 — Dashboard di Monitoraggio Always‑On
+# DisplayMetrics – Distributed PC Monitoring System
 
-### 1. Obiettivo del progetto
-Trasformare un vecchio smartphone (Huawei Y6 2019) in un display always‑on che mostri, in LAN e in tempo reale, dashboard suddivise per pagine:
+## Overview
 
-- Stato hardware PC (CPU, GPU, RAM, SSD, ventole)
-- Meteo locale in tempo reale
-- Stato rete locale (download/upload, ping, stato connessione)
-- Stato server cloud personale (online/offline, servizi attivi)
+DisplayMetrics è un sistema distribuito per il monitoraggio di metriche hardware e di rete. Raccoglie dati da un PC Windows e li visualizza in tempo reale su un dispositivo mobile (Grafana in kiosk mode). Il progetto integra script PowerShell, Telegraf, InfluxDB e dashboard Grafana per una soluzione LAN‑only.
 
-Tutti i componenti devono funzionare esclusivamente in LAN (nessun accesso esterno richiesto).
+## Architettura
 
----
-
-### 2. Architettura generale
-
-Dispositivi coinvolti:
-
-- **PC Windows** (raccoglie metriche)
-- **Telefono server** (Termux — InfluxDB + Grafana)
-- **Huawei Y6** (solo visualizzazione in kiosk)
-
-Flusso dati:
-
-PC Windows → Telefono server (InfluxDB) → Grafana → Huawei Y6 (browser in fullscreen)
-
-Il telefono usato come display non esegue alcun calcolo, apre solo le pagine web.
-
----
-
-### 3. Componenti software principali
-
-- Su PC Windows: HWiNFO64 / OpenHardwareMonitor, Telegraf, Speedtest CLI
-- Su Telefono (Termux): InfluxDB, Grafana, (opzionale: Node‑RED, Python)
-- Sul Huawei Y6: Fully Kiosk Browser o browser in fullscreen
-
----
-
-### 4. Configurazione dettagliata (passo‑passo)
-
-#### SEZIONE A — Configurazione PC Windows
-
-##### A.1 Installare
-
-- HWiNFO64: https://www.hwinfo.com/download/
-- Telegraf: https://www.influxdata.com/time-series-platform/telegraf/
-- Speedtest CLI: https://www.speedtest.net/apps/cli
-
-##### A.2 HWiNFO (sensori)
-
-- Avviare HWiNFO in modalità **Sensors only**
-- Abilitare **Shared Memory Support** (o usare OpenHardwareMonitor) per esporre le temperature a Telegraf
-
-##### A.3 Telegraf (config base)
-
-Path di esempio: `C:\telegraf\telegraf.conf`
-
-Esempio (snippet):
-
-```toml
-[[inputs.win_perf_counters.object]]
-	ObjectName = "Processor"
-	Counters = ["% Processor Time"]
-	Instances = ["_Total"]
-
-[[inputs.exec]]
-	commands = ["powershell -File \"C:\telegraf\scripts\collect-speedtest.ps1\""]
-	timeout = "120s"
-	interval = "300s"
-	data_format = "influx"
-
-[[outputs.influxdb]]
-	urls = ["http://IP_TELEFONO_SERVER:8086"]
-	database = "pc_metrics"
+```text
+PC Windows (Telegraf + PowerShell scripts)
+        ↓
+InfluxDB (Termux server locale)
+        ↓
+Grafana (Termux)
+        ↓
+Huawei Display (Browser kiosk mode)
 ```
 
-Sostituire `IP_TELEFONO_SERVER` con l'IP reale del Termux server.
+## Componenti principali
 
-##### A.4 Temperature avanzate
+1. Data Collection (Windows PC)
 
-- Usare OpenHardwareMonitor o HWiNFO shared memory per leggere CPU/GPU/SSD e inviarle via plugin o script a Telegraf.
+- `Telegraf` con plugin:
+  - `inputs.win_perf` — raccolta contatori di Windows
+  - `inputs.exec` — esecuzione di script esterni (PowerShell)
 
-##### A.5 Avvio automatico
+- Script PowerShell (cartella `pc-windows/telegraf/scripts/` o `C:\telegraf\scripts`):
+  - `collect-hardware-temps.ps1` — interroga OpenHardwareMonitor/LibreHardwareMonitor (es. `localhost:8085`) per CPU/GPU/SSD temperatures e formatta l'output per InfluxDB.
+  - `collect-speedtest.ps1` — esegue `speedtest.exe` e produce download/upload/ping in formato compatibile (line protocol o JSON convertito da Telegraf).
+  - Altri script: raccolta `net` (interfacce), `ping_status`, GPU metrics, ecc.
 
-- Impostare HWiNFO e Telegraf per l'avvio automatico (Telegraf come servizio).
+Funzioni chiave:
 
----
+- Raccolta di sensori hardware e metriche rete
+- Parsing e formattazione in Influx Line Protocol
+- Invio dati verso InfluxDB remoto (configurazione in `telegraf.conf`)
 
-#### SEZIONE B — Configurazione Telefono server (Termux)
+2. Database Layer
 
-##### B.1 Installazione base
+- `InfluxDB` eseguito sul telefono server (Termux)
+- Database usato: `pc_metrics`
+- Measurements principali:
+  - `hardware_temps`
+  - `speedtest`
+  - `cpu`, `mem`, `disk`, `net`
+  - `ping_status`
 
-Da Termux:
+3. Visualization Layer
 
-```bash
-pkg update && pkg upgrade
-pkg install influxdb grafana python nodejs
+- `Grafana` su Termux con dashboard JSON personalizzate (cartella `phone-server/grafana-dashboards/`)
+- Visualizzazione sul Huawei in modalità kiosk (Fully Kiosk Browser o browser fullscreen)
+
+## Problemi tecnici affrontati
+
+- Parsing dei dati JSON da OpenHardwareMonitor
+- Formattazione corretta in Influx Line Protocol
+- Sincronizzazione polling (es. 5s/300s per determinate metriche)
+- Debug e comunicazione tra PC Windows e server Termux
+- Gestione degli errori negli script PowerShell
+
+## Come avviare il progetto (quickstart)
+
+1. Su PC Windows:
+
+```powershell
+# Assumendo Telegraf installato in C:\telegraf
+Start-Process -FilePath "C:\telegraf\telegraf.exe"
+# Eseguire manualmente uno script per test
+powershell -File "C:\telegraf\scripts\collect-speedtest.ps1"
 ```
 
-##### B.2 InfluxDB
-
-Avvio:
+2. Su Termux (telefono server):
 
 ```bash
+# Avvia InfluxDB
 influxd &
-```
 
-Creare DB e retention policy:
-
-```sql
-influx
-CREATE DATABASE pc_metrics
-CREATE RETENTION POLICY "30days" ON "pc_metrics" DURATION 30d REPLICATION 1 DEFAULT
-exit
-```
-
-##### B.3 Grafana
-
-Avvio:
-
-```bash
+# Avvia Grafana
 grafana-server --homepath $PREFIX/share/grafana &
 ```
 
-Accesso: `http://IP_TELEFONO_SERVER:3000` (admin password di default)
+3. Importare dashboard Grafana (opzionale): importare i JSON presenti in `phone-server/grafana-dashboards/` via UI o API.
 
-Collegare Grafana a InfluxDB: Data Sources → InfluxDB → URL `http://localhost:8086` → Database `pc_metrics`.
+4. Aprire il browser sul Huawei e puntare all'URL di Grafana (es. `http://IP_TELEFONO_SERVER:3000`) in modalità kiosk.
 
----
-
-#### SEZIONE C — Creazione dashboard
-
-- **PC**: pannelli per CPU temp, GPU temp, RAM, Disk, Fan (Gauge / Stat / Graph)
-- **Meteo**: script Python (Open‑Meteo o OpenWeather) che invia a InfluxDB
-- **Rete**: speedtest (download/upload/ping) e storici
-- **Server**: ping/servizi (online=1 / offline=0)
-
----
-
-#### SEZIONE D — Huawei Y6 (display)
-
-- Consigliato: Fully Kiosk Browser
-- Impostazioni utili: avvio automatico, schermo sempre acceso, apertura URL Grafana in kiosk mode
-- Creare una dashboard Grafana per ciascuna pagina e impostare il browser per ciclare tra gli URL se necessario
-
----
-
-#### SEZIONE E — Rete locale
-
-- Tutti i dispositivi devono essere nella stessa LAN
-- Suggerito: IP statici (es. server `192.168.1.50`, PC `192.168.1.10`, Huawei `192.168.1.20`)
-
----
-
-#### SEZIONE F — Espansioni future
-
-- Monitor UPS, Stato stampante, sensori IoT, notifiche Telegram, log Windows, stato torrent, calendario
-
----
-
-### 5. Impatto sulle prestazioni
-
-- PC Windows: CPU <1%, RAM 100–200 MB
-- Telefono server: InfluxDB+Grafana ~250–300 MB (30 giorni retention)
-- Huawei Y6: solo browser, impatto minimo
-
----
-
-### 6. Risultato atteso
-
-Un Huawei Y6 trasformato in pannello NOC, sempre acceso, automatico, con dati locali e retention 30 giorni.
-
----
-
-### File utili nel repository
+## File utili nel repository
 
 - `AVVIO-E-STOP.md` — comandi rapidi per avviare/fermare servizi (PC e Termux)
 - `phone-server/grafana-dashboards/` — JSON dashboard pronte per import
 - `pc-windows/telegraf/` — configurazioni e script Telegraf
+
+## Tecnologie
+
+- PowerShell
+- Telegraf
+- InfluxDB
+- Grafana
+- HTML/CSS/JS (frontend visualizzazione)
+
+## Contributore
+
+Scrittura e debug degli script PowerShell per raccolta dati, configurazione Telegraf/InfluxDB, integrazione end‑to‑end e documentazione.
+
+---
+
+Se vuoi, posso:
+
+- inserire esempi di `telegraf.conf` e snippet di script `collect-*` direttamente nel README;
+- aggiungere comandi di installazione/auto‑start per Windows e Termux;
+- preparare un commit con queste modifiche.
