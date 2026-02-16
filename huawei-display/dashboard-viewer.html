@@ -729,18 +729,78 @@
             .forecast-item .f-pop { font-size: 11px; }
         }
 
-        /* ===== PC PAGE: compact fit-to-screen (PHONE ONLY) ===== */
+        /* ===== Mobile (portrait) — adapt desktop-like layout to narrow screens ===== */
         @media (max-width: 767px) {
+            /* Page frame: keep room for navbar, allow scrolling if content slightly overflows */
             #page-pc {
                 overflow-y: auto !important;
                 overflow-x: hidden !important;
-                gap: 2px;
-                padding: 4px 6px 40px;
+                gap: 6px;
+                padding: 6px 8px 56px; /* bottom padding ~= navbar height + margin */
             }
-            #page-pc .grid { gap: 3px; }
-            #page-pc .card { padding: 5px 8px; }
-            #page-pc .grid[style*="margin-top"] { margin-top: 2px !important; }
-            #gpu-info-grid .card { padding: 3px 6px; }
+
+            /* General grid spacing */
+            #page-pc .grid { gap: 8px; }
+
+            /* Top gauges: try 3 columns on wider phones, collapse to 2 then 1 */
+            .grid.grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+            .grid.grid-3 > .card:nth-child(3) { grid-column: 1 / 4; }
+            @media (max-width: 420px) {
+                .grid.grid-3 { grid-template-columns: repeat(2, 1fr); }
+                .grid.grid-3 > .card:nth-child(3) { grid-column: 1 / 3; }
+            }
+            @media (max-width: 360px) {
+                .grid.grid-3 { grid-template-columns: 1fr; }
+                .grid.grid-3 > .card:nth-child(3) { grid-column: 1 / 2; }
+            }
+
+            /* Usage / details: prefer two-column pairs but collapse on narrow widths */
+            .grid.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+            @media (max-width: 420px) { .grid.grid-2 { grid-template-columns: 1fr; } }
+
+            /* Disk / small-info container: stack on mobile */
+            #disk-container { display: grid; grid-template-columns: 1fr; gap: 8px; }
+
+            /* Card sizing and visual balance (keeps similarity with desktop) */
+            .card { padding: 8px 10px; border-radius: 10px; }
+            .card::before { height: 1px; }
+            .card-label { font-size: 9px; }
+            .card-value { font-size: 16px; }
+            .card-unit { font-size: 10px; }
+            .card-sub { font-size: 10px; }
+
+            /* Gauges slightly smaller but readable */
+            .gauge-ring { width: 50px; height: 50px; }
+            .gauge-ring svg { stroke-width: 7; }
+            .gauge-center .val { font-size: 13px; }
+            .gauge-center .unit { font-size: 8px; }
+
+            /* Bars & sparklines */
+            .bar-container { height: 6px; margin-top: 6px; border-radius: 6px; }
+            .sparkline-container { height: 44px; margin-top: 6px; }
+
+            /* Slightly reduce padding for very small devices */
+            @media (max-width: 340px) {
+                .card { padding: 6px 8px; border-radius: 8px; }
+                .gauge-ring { width: 44px; height: 44px; }
+                .card-value { font-size: 15px; }
+            }
+
+            /* Navbar: fixed overlay with reserved page bottom padding */
+            .navbar { position: fixed; bottom: 0; left: 0; right: 0; height: 48px; padding-bottom: env(safe-area-inset-bottom, 6px); }
+
+            /* Keep GPU / disk visible (don't hide) but make them compact */
+            #gpu-info-grid .card { padding: 6px 8px; }
+            #disk-container .card-sub { font-size: 10px; }
+
+            /* SSD mobile: hide circular gauge, show horizontal bar instead */
+            #gauge-ssd-temp { display: none !important; }
+            .ssd-bar { display: block !important; margin-top: 6px; width: 100%; box-sizing: border-box; padding: 0; }
+            .ssd-bar-row { display:flex; justify-content:flex-start; align-items:center; margin-bottom:6px; gap:8px; padding:0 0 6px 0; }
+            .ssd-bar-value { font-size: 12px; color: var(--text); opacity: 0.95; white-space:nowrap; }
+            /* extend track to card edges (ignore card padding) */
+            .ssd-bar-track { background: rgba(255,255,255,0.06); border-radius: 6px; height: 8px; overflow: hidden; width: calc(100% + 16px); margin-left: -8px; margin-right: -8px; }
+            .ssd-bar-fill { height: 100%; border-radius: 6px; transition: width 0.6s ease, background 0.3s ease; width:0%; background: var(--yellow); }
         }
 
         /* Sparklines: auto-expand on tall screens */
@@ -889,6 +949,15 @@
                 <div class="gauge-center">
                     <div class="val" data-field="ssd-temp">--</div>
                     <div class="unit">°C</div>
+                </div>
+            </div>
+            <!-- Mobile-only alternative: a horizontal bar that mirrors temperature percent (0..80°C) -->
+            <div class="ssd-bar" aria-hidden="true">
+                <div class="ssd-bar-row">
+                    <div class="ssd-bar-value">-- °C</div>
+                </div>
+                <div class="ssd-bar-track">
+                    <div class="ssd-bar-fill" style="width:0%"></div>
                 </div>
             </div>
         </div>
@@ -1144,7 +1213,22 @@ function initSparkAutoOpen() {
     });
 }
 initSparkAutoOpen();
-window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { initSparkAutoOpen(); if (currentPage === 'rete') fetchRete(); }, 150); });
+// Sync SSD bar visibility with viewport width
+function syncSsdBarVisibility() {
+    const mobile = window.innerWidth <= 767;
+    const gauge = document.getElementById('gauge-ssd-temp');
+    const bar = document.querySelector('.ssd-bar');
+    if (!gauge || !bar) return;
+    if (mobile) {
+        gauge.style.display = 'none';
+        bar.style.display = 'block';
+    } else {
+        gauge.style.display = '';
+        bar.style.display = 'none';
+    }
+}
+initSparkAutoOpen();
+window.addEventListener('resize', () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(() => { initSparkAutoOpen(); try { syncSsdBarVisibility(); } catch(e) {} if (currentPage === 'rete') fetchRete(); }, 150); });
 
 // ===== NAVIGAZIONE =====
 function switchPage(page, idx, direction) {
@@ -1230,7 +1314,24 @@ function setVal(field, val, decimals, unit) {
         return null;
     }
     const n = Number(val).toFixed(decimals);
-    setText(field, n + (unit ? `<span class="card-unit">${unit}</span>` : ''));
+    const rendered = n + (unit ? `<span class="card-unit">${unit}</span>` : '');
+    setText(field, rendered);
+
+    // Special-case: update SSD mobile bar (range 0..80°C)
+    try {
+        if (field === 'ssd-temp') {
+            const num = Number(n);
+            const pct = Math.max(0, Math.min(100, Math.round((num / 80) * 100)));
+            const fill = document.querySelector('.ssd-bar .ssd-bar-fill');
+            const valEl = document.querySelector('.ssd-bar .ssd-bar-value');
+            if (fill) {
+                fill.style.width = pct + '%';
+                try { fill.style.background = tempColor(num); } catch(e) {}
+            }
+            if (valEl) valEl.textContent = (isNaN(num) ? '--' : num) + '°C';
+        }
+    } catch (e) { /* ignore */ }
+
     return Number(n);
 }
 
@@ -1796,10 +1897,12 @@ document.addEventListener('touchend', e => {
 
 // ===== INIT =====
 preventSleep();
-fetchAll();
-setInterval(fetchAll, REFRESH_MS);
+    // ensure SSD display mode matches initial viewport
+    try { syncSsdBarVisibility(); } catch(e) {}
+    fetchAll();
+    setInterval(fetchAll, REFRESH_MS);
 document.addEventListener('touchmove', e => { if (e.touches.length > 1) e.preventDefault(); }, { passive: false });
-window.addEventListener('orientationchange', () => setTimeout(fetchAll, 300));
+window.addEventListener('orientationchange', () => { setTimeout(() => { try { syncSsdBarVisibility(); } catch(e) {} fetchAll(); }, 300); });
 
 // ===== KEYBOARD NAVIGATION (desktop) =====
 document.addEventListener('keydown', (e) => {
