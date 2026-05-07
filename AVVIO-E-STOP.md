@@ -55,6 +55,9 @@ cd ~/dashboard-server/scripts
 python weather_collector.py &
 ```
 
+Oppure
+bash ~/phone-server/start-services.sh
+
 ### ⏹️ STOP
 
 ```bash
